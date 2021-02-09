@@ -289,7 +289,10 @@
                                   :password "something"}}
           migrator (update no-migrator :database assoc
                            :migrator-username "admin"
-                           :migrator-password "admin")]
+                           :migrator-password "admin")
+          connection-user (update migrator :database assoc
+                                  :connection-username "connection-user-value"
+                                  :connection-migrator-username "connection-migration-user-value")]
 
       (testing "migrator-username"
         (let [config (configure-dbs no-migrator)]
@@ -305,7 +308,14 @@
           (is (= "something" (get-in config [:read-database :migrator-password]))))
         (let [config (configure-dbs migrator)]
           (is (= "admin" (get-in config [:database :migrator-password])))
-          (is (= "admin" (get-in config [:read-database :migrator-password]))))))))
+          (is (= "admin" (get-in config [:read-database :migrator-password]))))))
+
+      (testing "connection username"
+        (let [config (configure-dbs connection-user)]
+          (is (= "connection-user-value" (get)))
+          )
+        )
+    ))
 
 (deftest database-user-preferred-to-username-on-mismatch
   (let [config (configure-dbs {:database {:classname "something"
