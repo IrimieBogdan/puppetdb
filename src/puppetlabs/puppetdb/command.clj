@@ -397,7 +397,7 @@
 
 ;; Report submission
 
-(defn prep-store-report [{:keys [version received] :as command}]
+(defn prep-store-report [{:keys [version received] :as command} blocklist-config]
   (-> command
       (update :payload #(upon-error-throw-fatality
                          (s/validate report/report-wireformat-schema
@@ -408,7 +408,9 @@
                                        6 (report/wire-v6->wire-v8 %)
                                        7 (report/wire-v7->wire-v8 %)
                                        %))))
-      (update-in [:payload :producer_timestamp] #(or % (now)))))
+
+      (update-in [:payload :producer_timestamp] #(or % (now)))
+      (update-in [:payload :resource-events-ttl] #(or % (:resource-events-ttl blocklist-config)))))
 
 (defn exec-store-report [{:keys [payload id received]} start-time db conn-status]
   (let [{:keys [certname puppet_version producer_timestamp] :as report} payload]
@@ -445,7 +447,7 @@
   (case command
     "replace catalog" (prep-replace-catalog cmd)
     "replace facts" (prep-replace-facts cmd blocklist-config)
-    "store report" (prep-store-report cmd)
+    "store report" (prep-store-report cmd blocklist-config)
     "deactivate node" (prep-deactivate-node cmd)
     "configure expiration" (prep-configure-expiration cmd)
     "replace catalog inputs" (prep-replace-catalog-inputs cmd)))
@@ -878,7 +880,8 @@
                                              (-> config
                                                  :database
                                                  (select-keys [:facts-blocklist
-                                                               :facts-blocklist-type]))
+                                                               :facts-blocklist-type
+                                                               :resource-events-ttl]))
                                              maybe-send-cmd-event!
                                              shutdown-for-ex)]
       (when broadcast-pool
