@@ -1,0 +1,8 @@
+
+[{"path": "/pdb/query/v4/facts",
+  "query": ["~", "certname", "host*"]},
+
+ "This is a comment...",
+ {"#": "And so is this",
+  "path": "/pdb/query/v4/nodes",
+  "query": ["=", ["fact", "kernel"], "Linux"]}]
