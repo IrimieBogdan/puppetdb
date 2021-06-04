@@ -7,7 +7,7 @@
 # for more information.
 
 from locust import HttpUser, task
-import __main__, argparse, json, locust.main, os, sys, yaml
+import __main__, argparse, json, locust.main, os, sys, yaml, subprocess
 
 sys.path[:0] = [os.getcwd() + '/locust']
 
@@ -59,14 +59,22 @@ def merge_args(defaults, program_args):
     return additional_args
 
 
+# print(__name__)
+
 if __name__ == '__main__':
+    print("!!!!!!!!!!!!!!!")
     default = [['--headless'], ['-H', 'http://localhost:8080'],
                ["-u", '1'], ["-r", '1'], ["-t", '1m']]
+
+    default5 = ['--headless', '-H', 'http://localhost:8080',
+               "-u", '1', "-r", '1', "-t", '1m']
                 #"--csv", prefix, "--html", prefix + "_report.html"
 
     missing_defaults = []
-
     missing_defaults = merge_args(default, sys.argv)
-    sys.argv = sys.argv + ['-f', __file__] + missing_defaults
+    # sys.argv = sys.argv + ['-f', __file__] + missing_defaults
 
-    sys.exit(locust.main.main())
+    new_args = sys.argv[1:] + ['-f', __file__] + missing_defaults
+
+    subprocess.run(["locust"] + new_args)
+    # sys.exit(locust.main.main(new_args))
