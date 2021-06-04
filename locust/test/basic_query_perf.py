@@ -7,7 +7,7 @@
 # for more information.
 
 from locust import HttpUser, task
-import __main__, argparse, json, locust.main, os, sys
+import __main__, argparse, json, locust.main, os, sys, yaml
 
 sys.path[:0] = [os.getcwd() + '/locust']
 
@@ -15,66 +15,58 @@ from pdb.util import log, read_query_data
 
 
 class PuppetDbLoadTest(HttpUser):
-    def response_printer(self, desc, response):
+    def response_printer(self, opts, response):
         if response.status_code == 0:
-            log('Fatal response status_code: 0 (Is the server running?)')
-            sys.exit(2)
+            print(response.error)
+            exit(1)
         elif response.status_code != 200:
-            print("Request: " + opts['name'] + " \n" +
-                  "Method: " + opts['method'] + " \n" +
-                  "Response status: " + str(response.status_code) + " \n" +
-                  "Response body: " + response.text + " \n" +
-                  "-------------------------------------------" + " \n")
+            print(
+                "Request: " + opts['name'] + " \n" +
+                "Method: " + opts['method'] + " \n" +
+                "Response status: " + str(response.status_code) + " \n" +
+                "Response body: " + response.text + " \n" +
+                "-------------------------------------------" + " \n")
 
     @task
     def swarm(self):
-        method = __main__.opt.method
-        for q in __main__.basic_queries:
-            query = q['query']
-            if method == 'get':
-                if not isinstance(query, str):
-                    query = json.dumps(query)
-                url = q['path'] + "?query=" + query
-                name = query
-                with self.client.request(method, url, name) as response:
-                    self.response_printer('%s %r' % (method, url), response)
-            elif method == 'post':
-                query = json.dumps({'query': query})
-                url = ' '.join([q['path'], query])
-                name = query
-                with self.client.request(method, q['path'], name, data=query,
-                                         headers={'content-type': 'application/json'}) as response:
-                    self.response_printer('%s %r' % (method, url), response)
-            else:
-                raise Exception('Unrecognized method:' + method)
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        with open(dir_path + '/config.yaml') as stream:
+            config = yaml.safe_load(stream)
+            for opts in config:
+                if (opts['method'] == 'GET'):
+                    url = opts['path'] + "?" + opts['query']
+                    with self.client.request(opts['method'], url, opts['name']) as response:
+                        self.response_printer(opts, response)
+                elif (opts['method'] == 'POST'):
+                    json_obj = json.dumps(opts['query'])
+                    with self.client.request(opts['method'], opts['path'], opts['name'], data=json_obj, headers=opts['headers']) as response:
+                        self.response_printer(opts, response)
 
 
 # Anything that shouldn't be available in the test module, should be
 # guarded by this test.
 
-if __name__ == '__main__':
+def merge_args(defaults, program_args):
+    additional_args = []
+    for default_arg in defaults:
+        found = False
+        for arg in program_args:
+            if arg == default_arg[0]:
+                found = True
+        if found == False:
+            additional_args += default_arg
 
-    defaults = ['--headless', '-H', 'http://localhost:8080',
-                "-u", '1', "-r", '1', "-t", '1m']
+    return additional_args
+
+
+if __name__ == '__main__':
+    default = [['--headless'], ['-H', 'http://localhost:8080'],
+               ["-u", '1'], ["-r", '1'], ["-t", '1m']]
                 #"--csv", prefix, "--html", prefix + "_report.html"
 
-    usage = 'basic_query_perf.py [-h] [--method {post,get}] -- LOCUST_ARG ...'
-    parser = argparse.ArgumentParser(usage=usage)
-    parser.add_argument('--method', choices=['post', 'get'], default='get',
-                        help='make queries by GET or POST')
+    missing_defaults = []
 
-    locust_group = \
-        parser.add_argument_group('locust arguments',
-                                  'All arguments after a -- are passed directly to locust'
-                                  ' (defaults: ' + ' '.join(defaults) + ')')
-    locust_group.add_argument('locust_args', nargs=argparse.REMAINDER,
-                              help=argparse.SUPPRESS)
-    opt = parser.parse_args()
-    if opt.locust_args and opt.locust_args[0] == '--':
-        opt.locust_args = opt.locust_args[1:]
+    missing_defaults = merge_args(default, sys.argv)
+    sys.argv = sys.argv + ['-f', __file__] + missing_defaults
 
-    with open('test-data/basic-queries.json', 'r') as f:
-        basic_queries = read_query_data(f)
-
-    sys.argv = [sys.argv[0]] + ['-f', __file__] + defaults + opt.locust_args
     sys.exit(locust.main.main())
